@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicorn Surprise</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0d1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-stars {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px; height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        /* Unicorn emoji animation */
+        .hero-emoji {
+            font-size: 80px;
+            animation: bounce 1s infinite alternate ease-in-out;
+            display: inline-block;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0) rotate(-5deg); }
+            100% { transform: translateY(-20px) rotate(5deg); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin: 20px 0 10px;
+            background: linear-gradient(135deg, #ff6b9d, #ffb347, #fff44f, #7bed9f, #70a1ff, #a855f7);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: rainbow 3s ease infinite;
+        }
+
+        @keyframes rainbow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        /* Info card */
+        .info-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .info-card h2 {
+            color: #ff6b9d;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 12px 0;
+            padding: 10px;
+            background: #0d1117;
+            border-radius: 10px;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .feature-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .feature-text strong {
+            color: #ffb347;
+        }
+
+        /* Warning */
+        .warning {
+            background: #1c1407;
+            border: 1px solid #d4a017;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin: 25px 0;
+            font-size: 0.9rem;
+            color: #f0d060;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-install {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .btn-install:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-cancel {
+            background: #21262d;
+            color: #8b949e;
+            border: 1px solid #30363d;
+        }
+
+        .btn-cancel:hover {
+            background: #30363d;
+            color: #e0e0e0;
+        }
+
+        /* Platform detection */
+        .platform-badge {
+            display: inline-block;
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-bottom: 10px;
+        }
+
+        /* Download section (hidden by default) */
+        .download-section {
+            display: none;
+            background: #161b22;
+            border: 1px solid #238636;
+            border-radius: 16px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+
+        .download-section.visible {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .download-section h3 {
+            color: #28a745;
+            margin-bottom: 15px;
+        }
+
+        .download-steps {
+            text-align: left;
+            padding: 0;
+            list-style: none;
+        }
+
+        .download-steps li {
+            padding: 8px 0;
+            border-bottom: 1px solid #21262d;
+            font-size: 0.95rem;
+        }
+
+        .download-steps li:last-child {
+            border-bottom: none;
+        }
+
+        .step-num {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background: #238636;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        code {
+            background: #0d1117;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #ff6b9d;
+        }
+
+        .all-platforms {
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .all-platforms a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .all-platforms a:hover {
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 40px;
+            padding: 20px;
+            color: #484f58;
+            font-size: 0.85rem;
+        }
+
+        /* Preview animation */
+        .preview {
+            margin: 20px 0;
+            padding: 20px;
+            background: #161b22;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+        }
+
+        .preview canvas {
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-stars" id="stars"></div>
+
+<div class="container">
+    <div class="hero-emoji">&#x1F984;</div>
+
+    <h1>Unicorn Surprise</h1>
+    <p class="subtitle">Licorne dansante & Oiia Cat a chaque lancement d'app</p>
+
+    <div class="info-card">
+        <h2>Comment ca marche ?</h2>
+
+        <div class="feature">
+            <span class="feature-icon">&#x1F504;</span>
+            <div class="feature-text">
+                <strong>A chaque demarrage ou deverrouillage</strong>, une fenetre vous demande si vous voulez activer ou desactiver les animations.
+            </div>
+        </div>
+
+        <div class="feature">
+            <span class="feature-icon">&#x1F984;</span>
+            <div class="feature-text">
+                <strong>Quand vous lancez une application</strong>, une licorne danse pendant 4 secondes avec des effets arc-en-ciel.
+            </div>
+        </div>
+
+        <div class="feature">
+            <span class="feature-icon">&#x1F431;</span>
+            <div class="feature-text">
+                <strong>Puis l'Oiia Cat</strong> recule en mode "oiia oiia" pendant 3 secondes. Total : 7 secondes de fun.
+            </div>
+        </div>
+
+        <div class="feature">
+            <span class="feature-icon">&#x1F6E1;&#xFE0F;</span>
+            <div class="feature-text">
+                <strong>Consentement renouvele</strong> : le choix ne dure que jusqu'au prochain demarrage/deverrouillage. Vous restez toujours en controle.
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview">
+        <canvas id="previewCanvas" width="460" height="200"></canvas>
+    </div>
+
+    <div class="warning">
+        &#x26A0;&#xFE0F; Ce programme s'installe sur votre ordinateur et se lance a chaque demarrage.
+        Il detecte les ouvertures d'applications pour afficher des animations.
+        Vous pouvez le desactiver a tout moment ou le desinstaller.
+    </div>
+
+    <span class="platform-badge" id="platformBadge">Detection de la plateforme...</span>
+
+    <div class="btn-group">
+        <button class="btn btn-install" id="installBtn" onclick="startInstall()">
+            &#x1F4E5; Installer quand meme
+        </button>
+        <button class="btn btn-cancel" onclick="cancelInstall()">
+            &#x274C; Annuler
+        </button>
+    </div>
+
+    <!-- Download instructions -->
+    <div class="download-section" id="downloadLinux">
+        <h3>&#x1F427; Installation Linux</h3>
+        <ol class="download-steps">
+            <li><span class="step-num">1</span> Telechargez le projet :
+                <code>git clone https://github.com/OWNER/unicorn-surprise.git</code></li>
+            <li><span class="step-num">2</span> Lancez l'installeur :
+                <code>cd unicorn-surprise && bash install_linux.sh</code></li>
+            <li><span class="step-num">3</span> C'est pret ! L'app se lancera au prochain demarrage.</li>
+        </ol>
+    </div>
+
+    <div class="download-section" id="downloadMac">
+        <h3>&#x1F34E; Installation macOS</h3>
+        <ol class="download-steps">
+            <li><span class="step-num">1</span> Telechargez le projet :
+                <code>git clone https://github.com/OWNER/unicorn-surprise.git</code></li>
+            <li><span class="step-num">2</span> Lancez l'installeur :
+                <code>cd unicorn-surprise && bash install_mac.sh</code></li>
+            <li><span class="step-num">3</span> C'est pret ! L'app se lancera a chaque connexion.</li>
+        </ol>
+    </div>
+
+    <div class="download-section" id="downloadWindows">
+        <h3>&#x1FAA9; Installation Windows</h3>
+        <ol class="download-steps">
+            <li><span class="step-num">1</span> Telechargez le projet :
+                <code>git clone https://github.com/OWNER/unicorn-surprise.git</code></li>
+            <li><span class="step-num">2</span> Ouvrez PowerShell en admin et lancez :
+                <code>cd unicorn-surprise; powershell -ExecutionPolicy Bypass -File install_windows.ps1</code></li>
+            <li><span class="step-num">3</span> C'est pret ! L'app se lancera a chaque demarrage.</li>
+        </ol>
+    </div>
+
+    <div class="all-platforms" id="allPlatforms" style="display:none;">
+        <p>Autres plateformes :
+            <a href="#" onclick="showDownload('Linux')">Linux</a> |
+            <a href="#" onclick="showDownload('Mac')">macOS</a> |
+            <a href="#" onclick="showDownload('Windows')">Windows</a>
+        </p>
+    </div>
+
+    <div class="footer">
+        <p>Unicorn Surprise - 100% open source, 0% malware, 100% licorne</p>
+    </div>
+</div>
+
+<script>
+    // Stars background
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 80; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        star.style.animationDuration = (2 + Math.random() * 3) + 's';
+        starsContainer.appendChild(star);
+    }
+
+    // Platform detection
+    const platform = navigator.platform.toLowerCase();
+    const userAgent = navigator.userAgent.toLowerCase();
+    let detectedPlatform = 'Linux';
+
+    if (platform.includes('win') || userAgent.includes('windows')) {
+        detectedPlatform = 'Windows';
+    } else if (platform.includes('mac') || userAgent.includes('mac')) {
+        detectedPlatform = 'Mac';
+    }
+
+    const badges = {
+        'Linux': '&#x1F427; Linux detecte',
+        'Mac': '&#x1F34E; macOS detecte',
+        'Windows': '&#x1FAA9; Windows detecte'
+    };
+    document.getElementById('platformBadge').innerHTML = badges[detectedPlatform];
+
+    function startInstall() {
+        showDownload(detectedPlatform);
+        document.getElementById('allPlatforms').style.display = 'block';
+    }
+
+    function showDownload(platform) {
+        document.querySelectorAll('.download-section').forEach(el => el.classList.remove('visible'));
+        document.getElementById('download' + platform).classList.add('visible');
+    }
+
+    function cancelInstall() {
+        window.location.href = 'https://www.google.com';
+    }
+
+    // Preview animation
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    let animFrame = 0;
+
+    function drawPreview() {
+        const t = animFrame / 30;
+        const w = canvas.width;
+        const h = canvas.height;
+
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, w, h);
+
+        if (t % 14 < 4) {
+            // Unicorn phase
+            const phase = t % 14;
+
+            // Rainbow lines
+            const colors = ['#ff0000', '#ff7700', '#ffff00', '#00ff00', '#0077ff', '#8800ff'];
+            colors.forEach((c, i) => {
+                ctx.strokeStyle = c;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const y = 20 + i * 25 + Math.sin(phase * 3 + i) * 10;
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y + Math.sin(phase * 2 + i) * 15);
+                ctx.stroke();
+            });
+
+            // Simple unicorn body
+            const cx = w / 2 + Math.sin(phase * 2) * 20;
+            const cy = h / 2 + Math.sin(phase * 6) * 10;
+
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + 5, 35, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            const hx = cx + 32;
+            const hy = cy - 12 + Math.sin(phase * 4) * 4;
+            ctx.beginPath();
+            ctx.ellipse(hx, hy, 14, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Horn
+            ctx.strokeStyle = '#ff6b9d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(hx + 6, hy - 10);
+            ctx.lineTo(hx + 10, hy - 28);
+            ctx.stroke();
+
+            // Eye
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(hx + 5, hy - 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Legs
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 3;
+            [-20, -6, 6, 20].forEach((off, i) => {
+                const kick = Math.sin(phase * 8 + i * Math.PI / 2) * 10;
+                ctx.beginPath();
+                ctx.moveTo(cx + off, cy + 20);
+                ctx.lineTo(cx + off + kick, cy + 42);
+                ctx.stroke();
+            });
+
+            // Text
+            const ri = Math.floor(phase * 8) % colors.length;
+            ctx.fillStyle = colors[ri];
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('~ UNICORN DANCE ~', w / 2, h - 15);
+
+        } else if (t % 14 < 7) {
+            // Oiia cat phase
+            const phase = (t % 14) - 4;
+
+            ctx.fillStyle = '#0d1117';
+            ctx.fillRect(0, 0, w, h);
+
+            const catX = w - 60 - (phase / 3) * (w - 80);
+            const catY = h / 2 + 15;
+
+            // Body
+            ctx.fillStyle = '#ff8c00';
+            ctx.beginPath();
+            ctx.ellipse(catX, catY, 28, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            const headX = catX + 30;
+            const headY = catY - 10 + Math.sin(phase * 6) * 5;
+            ctx.beginPath();
+            ctx.ellipse(headX, headY, 14, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ears
+            [-8, 8].forEach(off => {
+                ctx.beginPath();
+                ctx.moveTo(headX + off - 4, headY - 10);
+                ctx.lineTo(headX + off, headY - 22);
+                ctx.lineTo(headX + off + 4, headY - 10);
+                ctx.fill();
+            });
+
+            // Eyes
+            ctx.fillStyle = 'white';
+            [-5, 5].forEach(off => {
+                ctx.beginPath();
+                ctx.arc(headX + off, headY - 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.fillStyle = 'black';
+            [-5, 5].forEach(off => {
+                ctx.beginPath();
+                ctx.arc(headX + off + Math.sin(phase * 15) * 1.5, headY - 2, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Mouth
+            ctx.fillStyle = '#ff4444';
+            const mouthOpen = Math.abs(Math.sin(phase * 6)) * 6 + 2;
+            ctx.beginPath();
+            ctx.ellipse(headX, headY + 5, 4, mouthOpen / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // OIIA text
+            const letters = ['O', 'I', 'I', 'A'];
+            const oColors = ['#ff4444', '#ff8844', '#ffcc44', '#ff4444'];
+            const li = Math.floor(phase * 4) % 4;
+            ctx.textAlign = 'center';
+            letters.forEach((l, i) => {
+                const size = i === li ? 22 : 16;
+                ctx.font = `bold ${size}px Arial`;
+                ctx.fillStyle = oColors[i];
+                ctx.fillText(l, w / 2 - 45 + i * 30, 30 + Math.sin(phase * 6 + i) * 6);
+            });
+
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#ff8c00';
+            ctx.fillText('~ oiia oiia oiia ~', w / 2, h - 12);
+
+        } else {
+            // Pause between loops
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, w, h);
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#444';
+            ctx.textAlign = 'center';
+            ctx.fillText('~ en attente du prochain lancement ~', w / 2, h / 2);
+        }
+
+        // Progress bar
+        const progress = (t % 7) / 7;
+        if (t % 14 < 7) {
+            ctx.fillStyle = '#ff6b9d';
+            ctx.fillRect(0, h - 4, w * progress, 4);
+        }
+
+        animFrame++;
+        requestAnimationFrame(drawPreview);
+    }
+
+    drawPreview();
+</script>
+
+</body>
+</html>
