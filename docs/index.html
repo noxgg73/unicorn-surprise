@@ -251,6 +251,50 @@
             color: #ff6b9d;
         }
 
+        .uninstall-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            padding: 25px 30px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .uninstall-card h2 {
+            color: #ff6b9d;
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .uninstall-card > p {
+            color: #9ca3af;
+            font-size: 0.92rem;
+            margin-bottom: 18px;
+        }
+
+        .uninstall-platform {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid #21262d;
+        }
+
+        .uninstall-platform:first-of-type {
+            border-top: none;
+            padding-top: 0;
+            margin-top: 0;
+        }
+
+        .uninstall-platform h3 {
+            color: #ffb347;
+            font-size: 1.05rem;
+            margin-bottom: 10px;
+        }
+
+        .uninstall-platform code {
+            display: inline-block;
+            word-break: break-all;
+        }
+
         .all-platforms {
             margin-top: 20px;
             font-size: 0.9rem;
@@ -391,6 +435,56 @@
             <a href="#" onclick="showDownload('Mac')">macOS</a> |
             <a href="#" onclick="showDownload('Windows')">Windows</a>
         </p>
+    </div>
+
+    <div class="uninstall-card">
+        <h2>&#x1F9F9; Comment desinstaller ?</h2>
+        <p>Unicorn Surprise s'installe uniquement dans votre dossier utilisateur
+           (<code>~/.unicorn-surprise</code>) et un raccourci de demarrage. Aucun service
+           systeme, aucun acces administrateur. Un script de desinstallation est fourni
+           pour chaque plateforme (dans le zip ou dans le repo).</p>
+
+        <div class="uninstall-platform">
+            <h3>&#x1F427; Linux</h3>
+            <ol class="download-steps">
+                <li><span class="step-num">&#x2728;</span> Script automatique :
+                    <code>bash uninstall_linux.sh</code></li>
+                <li><span class="step-num">1</span> Arreter le processus :
+                    <code>pkill -f unicorn_surprise.py</code></li>
+                <li><span class="step-num">2</span> Supprimer l'autostart :
+                    <code>rm -f ~/.config/autostart/unicorn-surprise.desktop</code></li>
+                <li><span class="step-num">3</span> Supprimer l'app :
+                    <code>rm -rf ~/.unicorn-surprise</code></li>
+            </ol>
+        </div>
+
+        <div class="uninstall-platform">
+            <h3>&#x1F34E; macOS</h3>
+            <ol class="download-steps">
+                <li><span class="step-num">&#x2728;</span> Script automatique :
+                    <code>bash uninstall_mac.sh</code></li>
+                <li><span class="step-num">1</span> Decharger l'agent :
+                    <code>launchctl unload ~/Library/LaunchAgents/com.unicorn-surprise.plist</code></li>
+                <li><span class="step-num">2</span> Supprimer le plist :
+                    <code>rm -f ~/Library/LaunchAgents/com.unicorn-surprise.plist</code></li>
+                <li><span class="step-num">3</span> Supprimer l'app :
+                    <code>rm -rf ~/.unicorn-surprise</code></li>
+            </ol>
+        </div>
+
+        <div class="uninstall-platform">
+            <h3>&#x1FAA9; Windows</h3>
+            <ol class="download-steps">
+                <li><span class="step-num">&#x2728;</span> Script automatique (PowerShell) :
+                    <code>powershell -ExecutionPolicy Bypass -File uninstall_windows.ps1</code></li>
+                <li><span class="step-num">1</span> Arreter le processus :
+                    <code>Get-Process python* | Where-Object { $_.CommandLine -like "*unicorn-surprise*" } | Stop-Process</code></li>
+                <li><span class="step-num">2</span> Supprimer le raccourci :
+                    <code>Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\Unicorn Surprise.lnk"</code></li>
+                <li><span class="step-num">3</span> Supprimer l'app :
+                    <code>Remove-Item "$env:USERPROFILE\.unicorn-surprise" -Recurse -Force</code></li>
+            </ol>
+        </div>
     </div>
 
     <div class="footer">
