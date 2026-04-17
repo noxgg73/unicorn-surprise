@@ -14,8 +14,8 @@ import platform
 import threading
 import time
 import math
+import queue
 import tkinter as tk
-from tkinter import font as tkfont
 
 try:
     import psutil
@@ -27,56 +27,67 @@ except ImportError:
 
 
 SYSTEM = platform.system()
+OWN_PID = os.getpid()
+
+
+def _own_process_tree():
+    """Return the set of PIDs in our own process tree (self + ancestors + children)."""
+    pids = {OWN_PID}
+    try:
+        me = psutil.Process(OWN_PID)
+        for anc in me.parents():
+            pids.add(anc.pid)
+        for ch in me.children(recursive=True):
+            pids.add(ch.pid)
+    except Exception:
+        pass
+    return pids
 
 
 # ─── Animation Overlay ───────────────────────────────────────────────────────
 
 class AnimationOverlay:
-    """Shows a fullscreen transparent overlay with animated unicorn/cat."""
+    """Fullscreen-ish popup overlay. Must be driven from the main Tk thread."""
 
-    def __init__(self):
+    def __init__(self, root):
+        self.root = root
         self.running = False
+        self.win = None
 
     def show(self):
         if self.running:
             return
         self.running = True
-        t = threading.Thread(target=self._run_animation, daemon=True)
-        t.start()
 
-    def _run_animation(self):
-        root = tk.Tk()
-        root.title("Unicorn Surprise")
-        root.attributes("-topmost", True)
-        root.configure(bg="black")
+        win = tk.Toplevel(self.root)
+        win.title("Unicorn Surprise")
+        win.attributes("-topmost", True)
+        win.configure(bg="black")
+        win.overrideredirect(True)
 
-        # Fullscreen
-        screen_w = root.winfo_screenwidth()
-        screen_h = root.winfo_screenheight()
-
-        # Window size for the animation (centered popup)
         win_w, win_h = 500, 400
+        screen_w = win.winfo_screenwidth()
+        screen_h = win.winfo_screenheight()
         x = (screen_w - win_w) // 2
         y = (screen_h - win_h) // 2
-        root.geometry(f"{win_w}x{win_h}+{x}+{y}")
-        root.resizable(False, False)
-        root.overrideredirect(True)
+        win.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        win.resizable(False, False)
 
-        canvas = tk.Canvas(root, width=win_w, height=win_h, bg="#1a1a2e", highlightthickness=0)
+        canvas = tk.Canvas(win, width=win_w, height=win_h, bg="#1a1a2e", highlightthickness=0)
         canvas.pack()
 
+        self.win = win
         self.canvas = canvas
         self.win_w = win_w
         self.win_h = win_h
-        self.root = root
-        self.frame = 0
         self.start_time = time.time()
-        self.phase = "unicorn"  # "unicorn" then "oiia_cat"
+        self.phase = "unicorn"
 
         self._animate()
-        root.mainloop()
 
     def _animate(self):
+        if not self.running or self.win is None:
+            return
         elapsed = time.time() - self.start_time
         self.canvas.delete("all")
 
@@ -88,31 +99,31 @@ class AnimationOverlay:
             self._draw_oiia_cat(elapsed - 4.0)
         else:
             self.running = False
-            self.root.destroy()
+            try:
+                self.win.destroy()
+            except Exception:
+                pass
+            self.win = None
             return
 
-        # Progress bar
         progress = elapsed / 7.0
         bar_y = self.win_h - 8
         self.canvas.create_rectangle(0, bar_y, self.win_w * progress, self.win_h,
                                      fill="#ff6b9d", outline="")
 
-        self.frame += 1
-        self.root.after(33, self._animate)  # ~30 FPS
+        self.win.after(33, self._animate)
 
     def _draw_unicorn(self, t):
         """Draw a dancing unicorn with rainbow effects."""
         w, h = self.win_w, self.win_h
         cx, cy = w // 2, h // 2
 
-        # Rainbow background waves
         colors = ["#ff0000", "#ff7700", "#ffff00", "#00ff00", "#0077ff", "#8800ff"]
         for i, color in enumerate(colors):
             wave_y = 50 + i * 45 + math.sin(t * 3 + i * 0.8) * 20
             self.canvas.create_line(0, wave_y, w, wave_y + math.sin(t * 2 + i) * 30,
                                     fill=color, width=3)
 
-        # Sparkles
         for i in range(12):
             sx = (i * 97 + int(t * 150)) % w
             sy = (i * 73 + int(t * 80)) % (h - 80) + 20
@@ -121,22 +132,18 @@ class AnimationOverlay:
             self.canvas.create_text(sx, sy, text="*", fill=sparkle_color,
                                     font=("Arial", int(8 + size)))
 
-        # Unicorn body (bouncing)
         bounce = math.sin(t * 6) * 15
         body_x = cx + math.sin(t * 2) * 30
         body_y = cy + bounce
 
-        # Body
         self.canvas.create_oval(body_x - 50, body_y - 20, body_x + 50, body_y + 30,
                                 fill="white", outline="#ddd", width=2)
 
-        # Head
         head_x = body_x + 45
         head_y = body_y - 25 + math.sin(t * 4) * 5
         self.canvas.create_oval(head_x - 15, head_y - 15, head_x + 20, head_y + 15,
                                 fill="white", outline="#ddd", width=2)
 
-        # Horn (rainbow)
         horn_colors = ["#ff6b9d", "#ffb347", "#fff44f"]
         horn_x = head_x + 10
         horn_y = head_y - 15
@@ -145,11 +152,9 @@ class AnimationOverlay:
                                     horn_x + 5, horn_y - 30 - math.sin(t * 3) * 5,
                                     fill=hc, width=2)
 
-        # Eye
         self.canvas.create_oval(head_x + 5, head_y - 5, head_x + 12, head_y + 2,
                                 fill="black")
 
-        # Legs (dancing)
         for i, lx_off in enumerate([-30, -10, 10, 30]):
             leg_phase = t * 8 + i * math.pi / 2
             leg_kick = math.sin(leg_phase) * 15
@@ -158,7 +163,6 @@ class AnimationOverlay:
             self.canvas.create_line(lx, ly, lx + leg_kick, ly + 35,
                                     fill="#ddd", width=4)
 
-        # Mane (flowing rainbow)
         for i in range(5):
             mx = body_x + 30 - i * 8
             my = body_y - 20 + i * 3
@@ -166,7 +170,6 @@ class AnimationOverlay:
             self.canvas.create_line(mx, my, mx - 15 + mane_flow, my - 15,
                                     fill=colors[i % len(colors)], width=3)
 
-        # Tail (rainbow flowing)
         tail_x = body_x - 50
         tail_y = body_y
         for i in range(4):
@@ -175,7 +178,6 @@ class AnimationOverlay:
             self.canvas.create_line(tail_x - i * 5, tail_y + i * 3,
                                     tx, ty, fill=colors[(i + 2) % len(colors)], width=3)
 
-        # Text
         text_y = h - 50
         rainbow_idx = int(t * 8) % len(colors)
         self.canvas.create_text(w // 2, text_y,
@@ -187,30 +189,23 @@ class AnimationOverlay:
         """Draw oiia cat going backwards."""
         w, h = self.win_w, self.win_h
 
-        # Background - darker vibe
         self.canvas.create_rectangle(0, 0, w, h, fill="#0d1117", outline="")
 
-        # Cat moves RIGHT to LEFT (backwards/reculer)
         cat_x = w - 80 - (t / 3.0) * (w - 100)
         cat_y = h // 2 + 20
 
-        # Body (oval, facing right but moving left = backwards)
         self.canvas.create_oval(cat_x - 35, cat_y - 20, cat_x + 35, cat_y + 25,
                                 fill="#ff8c00", outline="#cc7000", width=2)
 
-        # Head (cat is facing RIGHT but walking LEFT = oiia backwards)
         head_x = cat_x + 40
         head_y = cat_y - 15
 
-        # Head bob (oiia motion)
-        oiia_angle = math.sin(t * 8) * 15
         head_y += math.sin(t * 6) * 8
         head_x += math.cos(t * 6) * 3
 
         self.canvas.create_oval(head_x - 18, head_y - 16, head_x + 18, head_y + 16,
                                 fill="#ff8c00", outline="#cc7000", width=2)
 
-        # Ears
         for ear_off in [-10, 10]:
             ex = head_x + ear_off
             ey = head_y - 16
@@ -219,23 +214,19 @@ class AnimationOverlay:
             self.canvas.create_polygon(ex - 3, ey + 3, ex, ey - 7, ex + 3, ey + 3,
                                        fill="#ffb060", outline="")
 
-        # Eyes (wide open oiia expression)
         for eye_off in [-7, 7]:
             ex = head_x + eye_off
             ey = head_y - 3
             self.canvas.create_oval(ex - 5, ey - 5, ex + 5, ey + 5, fill="white")
-            # Pupils (vibrating for oiia effect)
             px = ex + math.sin(t * 15) * 2
             py = ey + math.cos(t * 12) * 1
             self.canvas.create_oval(px - 3, py - 3, px + 3, py + 3, fill="black")
 
-        # Mouth (open wide - OIIA!)
         mouth_open = abs(math.sin(t * 6)) * 8 + 3
         self.canvas.create_oval(head_x - 5, head_y + 4,
                                 head_x + 5, head_y + 4 + mouth_open,
                                 fill="#ff4444", outline="#cc0000")
 
-        # Legs (walking backwards animation)
         for i, lx_off in enumerate([-20, -8, 8, 20]):
             leg_phase = t * 10 + i * math.pi / 2
             leg_move = math.sin(leg_phase) * 12
@@ -244,7 +235,6 @@ class AnimationOverlay:
             self.canvas.create_line(lx, ly, lx - leg_move, ly + 25,
                                     fill="#cc7000", width=3)
 
-        # Tail (swinging wildly)
         tail_x = cat_x - 35
         tail_y = cat_y - 5
         tail_swing = math.sin(t * 5) * 25
@@ -253,13 +243,11 @@ class AnimationOverlay:
                                 tail_x - 35, tail_y - 10 + tail_swing * 0.5,
                                 fill="#cc7000", width=3, smooth=True)
 
-        # "OIIA" text pulsing
         oiia_texts = ["O", "I", "I", "A"]
         pulse = abs(math.sin(t * 4))
         text_size = int(28 + pulse * 12)
         oiia_colors = ["#ff4444", "#ff8844", "#ffcc44", "#ff4444"]
 
-        # Which letter to highlight based on time
         letter_idx = int(t * 4) % 4
 
         for i, (letter, color) in enumerate(zip(oiia_texts, oiia_colors)):
@@ -269,18 +257,15 @@ class AnimationOverlay:
             self.canvas.create_text(lx, ly, text=letter, fill=color,
                                     font=("Arial", size, "bold"))
 
-        # "mode reculer" text
         self.canvas.create_text(w // 2, h - 40,
                                 text="~ oiia oiia oiia ~",
                                 fill="#ff8c00",
                                 font=("Arial", 16, "bold"))
 
-        # Motion lines (showing backward movement)
         for i in range(5):
             line_x = cat_x + 50 + i * 15
             line_y = cat_y - 10 + (i * 17) % 40
             line_len = 10 + math.sin(t * 3 + i) * 5
-            alpha_colors = ["#334", "#445", "#556", "#445", "#334"]
             self.canvas.create_line(line_x, line_y, line_x + line_len, line_y,
                                     fill="#555", width=2)
 
@@ -288,7 +273,7 @@ class AnimationOverlay:
 # ─── Process Monitor ─────────────────────────────────────────────────────────
 
 class ProcessMonitor:
-    """Monitors for new process launches."""
+    """Monitors for new process launches and pushes events to a queue."""
 
     IGNORED_PROCESSES = {
         "svchost.exe", "conhost.exe", "RuntimeBroker.exe", "dllhost.exe",
@@ -308,17 +293,29 @@ class ProcessMonitor:
         "kernel_task", "launchd", "WindowServer", "loginwindow",
         "mds", "mds_stores", "fseventsd", "coreaudiod",
         "python", "python3", "pip", "unicorn_surprise",
+        "sh", "bash", "zsh", "dash", "tmux", "cron", "crond",
+        "sleep", "sudo", "su", "whoami", "which", "grep", "sed", "awk",
+        "tracker-", "goa-", "packagekit", "fwupd", "colord",
+        "rtkit-daemon", "upowerd", "accounts-daemon", "NetworkManager",
+        "wpa_supplicant", "ModemManager", "avahi-daemon",
+        "dconf-service", "xdg-desktop-portal",
     }
 
-    def __init__(self, overlay: AnimationOverlay):
-        self.overlay = overlay
+    COOLDOWN_SECONDS = 10.0
+
+    def __init__(self, event_queue):
+        self.queue = event_queue
         self.active = False
         self._stop_event = threading.Event()
         self._known_pids = set()
+        self._own_tree = _own_process_tree()
 
     def start(self):
+        if self.active:
+            return
         self.active = True
         self._stop_event.clear()
+        self._own_tree = _own_process_tree()
         self._known_pids = {p.pid for p in psutil.process_iter()}
         self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._thread.start()
@@ -331,19 +328,43 @@ class ProcessMonitor:
         while not self._stop_event.is_set():
             try:
                 current_pids = set()
-                for proc in psutil.process_iter(['pid', 'name']):
-                    current_pids.add(proc.pid)
-                    if proc.pid not in self._known_pids:
-                        name = proc.info.get('name', '')
-                        if name and not self._is_ignored(name):
-                            self.overlay.show()
-                            # Wait for animation to finish before detecting again
-                            time.sleep(8)
-                            break
+                trigger = None
+                for proc in psutil.process_iter(['pid', 'name', 'ppid', 'cmdline']):
+                    pid = proc.info.get('pid')
+                    current_pids.add(pid)
+                    if pid in self._known_pids:
+                        continue
+                    name = proc.info.get('name') or ''
+                    ppid = proc.info.get('ppid') or 0
+                    cmdline = proc.info.get('cmdline') or []
+                    if not name:
+                        continue
+                    if not cmdline:
+                        # kernel thread / empty cmdline — skip
+                        continue
+                    if ppid in self._own_tree or pid in self._own_tree:
+                        continue
+                    if self._is_ignored(name):
+                        continue
+                    trigger = name
+                    break
+
                 self._known_pids = current_pids
-            except Exception:
-                pass
-            time.sleep(2)
+
+                if trigger:
+                    print(f"[unicorn] detected launch: {trigger}")
+                    self.queue.put(('launch', trigger))
+                    # cooldown: let the animation play and avoid re-triggering
+                    # on subprocess spawns from the same app launch
+                    if self._stop_event.wait(self.COOLDOWN_SECONDS):
+                        break
+                    # refresh known PIDs so cooldown-spawned children aren't flagged
+                    self._known_pids = {p.pid for p in psutil.process_iter()}
+                    continue
+            except Exception as e:
+                print(f"[unicorn] monitor error: {e}", file=sys.stderr)
+            if self._stop_event.wait(1.5):
+                break
 
     def _is_ignored(self, name):
         name_lower = name.lower()
@@ -356,10 +377,10 @@ class ProcessMonitor:
 # ─── Screen Lock/Unlock Detection ────────────────────────────────────────────
 
 class ScreenMonitor:
-    """Detects screen unlock events (platform-specific)."""
+    """Detects screen unlock events (platform-specific) and pushes to queue."""
 
-    def __init__(self, on_unlock_callback):
-        self.callback = on_unlock_callback
+    def __init__(self, event_queue):
+        self.queue = event_queue
         self._stop = threading.Event()
 
     def start(self):
@@ -368,6 +389,9 @@ class ScreenMonitor:
 
     def stop(self):
         self._stop.set()
+
+    def _notify(self):
+        self.queue.put(('unlock', None))
 
     def _monitor(self):
         if SYSTEM == "Linux":
@@ -378,7 +402,6 @@ class ScreenMonitor:
             self._monitor_windows()
 
     def _monitor_linux(self):
-        """Monitor screen unlock via dbus."""
         try:
             import subprocess
             proc = subprocess.Popen(
@@ -396,12 +419,11 @@ class ScreenMonitor:
                     locked = True
                 elif "boolean false" in line and locked:
                     locked = False
-                    self.callback()
+                    self._notify()
         except Exception:
             pass
 
     def _monitor_macos(self):
-        """Monitor screen unlock on macOS."""
         try:
             import subprocess
             was_locked = False
@@ -414,26 +436,24 @@ class ScreenMonitor:
                 )
                 is_locked = result.stdout.strip() == "1"
                 if was_locked and not is_locked:
-                    self.callback()
+                    self._notify()
                 was_locked = is_locked
                 self._stop.wait(3)
         except Exception:
             pass
 
     def _monitor_windows(self):
-        """Monitor screen unlock on Windows via ctypes."""
         try:
             import ctypes
             was_locked = False
             while not self._stop.is_set():
-                # Check if workstation is locked
                 user32 = ctypes.windll.user32
                 desk = user32.OpenInputDesktop(0, False, 0x0100)
                 is_locked = desk == 0
                 if desk:
                     user32.CloseDesktop(desk)
                 if was_locked and not is_locked:
-                    self.callback()
+                    self._notify()
                 was_locked = is_locked
                 self._stop.wait(3)
         except Exception:
@@ -442,25 +462,24 @@ class ScreenMonitor:
 
 # ─── Choice Dialog ────────────────────────────────────────────────────────────
 
-def show_choice_dialog():
-    """Show Activer/Desactiver dialog. Returns True for activate, False for deactivate."""
+def show_choice_dialog(root):
+    """Show Activer/Desactiver dialog as a Toplevel of root. Blocks until closed."""
     result = [None]
 
-    root = tk.Tk()
-    root.title("Unicorn Surprise")
-    root.attributes("-topmost", True)
-    root.resizable(False, False)
+    win = tk.Toplevel(root)
+    win.title("Unicorn Surprise")
+    win.attributes("-topmost", True)
+    win.resizable(False, False)
 
     win_w, win_h = 420, 280
-    screen_w = root.winfo_screenwidth()
-    screen_h = root.winfo_screenheight()
+    screen_w = win.winfo_screenwidth()
+    screen_h = win.winfo_screenheight()
     x = (screen_w - win_w) // 2
     y = (screen_h - win_h) // 2
-    root.geometry(f"{win_w}x{win_h}+{x}+{y}")
-    root.configure(bg="#1a1a2e")
+    win.geometry(f"{win_w}x{win_h}+{x}+{y}")
+    win.configure(bg="#1a1a2e")
 
-    # Title
-    title_frame = tk.Frame(root, bg="#1a1a2e")
+    title_frame = tk.Frame(win, bg="#1a1a2e")
     title_frame.pack(pady=(25, 5))
 
     tk.Label(title_frame, text="Unicorn Surprise",
@@ -469,8 +488,7 @@ def show_choice_dialog():
     tk.Label(title_frame, text="~",
              font=("Arial", 14), fg="#ffb347", bg="#1a1a2e").pack()
 
-    # Description
-    desc_frame = tk.Frame(root, bg="#1a1a2e")
+    desc_frame = tk.Frame(win, bg="#1a1a2e")
     desc_frame.pack(pady=(5, 20))
 
     tk.Label(desc_frame,
@@ -483,88 +501,93 @@ def show_choice_dialog():
              font=("Arial", 9), fg="#888", bg="#1a1a2e",
              justify="center").pack(pady=(8, 0))
 
-    # Buttons
-    btn_frame = tk.Frame(root, bg="#1a1a2e")
+    btn_frame = tk.Frame(win, bg="#1a1a2e")
     btn_frame.pack(pady=(5, 20))
 
     def on_activate():
         result[0] = True
-        root.destroy()
+        win.destroy()
 
     def on_deactivate():
         result[0] = False
-        root.destroy()
+        win.destroy()
 
-    activate_btn = tk.Button(btn_frame, text="Activer",
-                             font=("Arial", 13, "bold"),
-                             fg="white", bg="#28a745",
-                             activebackground="#218838", activeforeground="white",
-                             relief="flat", padx=25, pady=8,
-                             cursor="hand2", command=on_activate)
-    activate_btn.pack(side="left", padx=10)
+    tk.Button(btn_frame, text="Activer",
+              font=("Arial", 13, "bold"),
+              fg="white", bg="#28a745",
+              activebackground="#218838", activeforeground="white",
+              relief="flat", padx=25, pady=8,
+              cursor="hand2", command=on_activate).pack(side="left", padx=10)
 
-    deactivate_btn = tk.Button(btn_frame, text="D\u00e9sactiver",
-                               font=("Arial", 13, "bold"),
-                               fg="white", bg="#dc3545",
-                               activebackground="#c82333", activeforeground="white",
-                               relief="flat", padx=25, pady=8,
-                               cursor="hand2", command=on_deactivate)
-    deactivate_btn.pack(side="left", padx=10)
+    tk.Button(btn_frame, text="D\u00e9sactiver",
+              font=("Arial", 13, "bold"),
+              fg="white", bg="#dc3545",
+              activebackground="#c82333", activeforeground="white",
+              relief="flat", padx=25, pady=8,
+              cursor="hand2", command=on_deactivate).pack(side="left", padx=10)
 
-    root.protocol("WM_DELETE_WINDOW", on_deactivate)
-    root.mainloop()
-    return result[0]
+    win.protocol("WM_DELETE_WINDOW", on_deactivate)
+    try:
+        win.grab_set()
+    except Exception:
+        pass
+    win.wait_window()
+    return bool(result[0])
 
 
-# ─── Main ─────────────────────────────────────────────────────────────────────
+# ─── Main App ────────────────────────────────────────────────────────────────
 
-def main():
-    choice = show_choice_dialog()
+class App:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self.events = queue.Queue()
+        self.overlay = AnimationOverlay(self.root)
+        self.process_monitor = ProcessMonitor(self.events)
+        self.screen_monitor = ScreenMonitor(self.events)
 
-    if choice is None or not choice:
-        print("Unicorn Surprise d\u00e9sactiv\u00e9. \u00c0 la prochaine fois !")
-        # Stay alive to detect next unlock
-        overlay = AnimationOverlay()
-        monitor = ProcessMonitor(overlay)
-        screen_mon = ScreenMonitor(lambda: on_unlock(overlay, monitor))
-        screen_mon.start()
-        # Keep process alive
+    def run(self):
+        activated = show_choice_dialog(self.root)
+        if activated:
+            print("Unicorn Surprise activ\u00e9 ! Les licornes arrivent...")
+            self.process_monitor.start()
+        else:
+            print("Unicorn Surprise d\u00e9sactiv\u00e9. \u00c0 la prochaine fois !")
+
+        self.screen_monitor.start()
+        self.root.after(100, self._poll_events)
+
+        try:
+            self.root.mainloop()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.process_monitor.stop()
+            self.screen_monitor.stop()
+
+    def _poll_events(self):
         try:
             while True:
-                time.sleep(60)
-        except KeyboardInterrupt:
-            screen_mon.stop()
-        return
+                ev = self.events.get_nowait()
+                self._handle_event(ev)
+        except queue.Empty:
+            pass
+        self.root.after(100, self._poll_events)
 
-    print("Unicorn Surprise activ\u00e9 ! Les licornes arrivent...")
-    overlay = AnimationOverlay()
-    monitor = ProcessMonitor(overlay)
-    monitor.start()
-
-    # Also monitor for screen unlock to show dialog again
-    def on_unlock_active(overlay, monitor):
-        monitor.stop()
-        on_unlock(overlay, monitor)
-
-    screen_mon = ScreenMonitor(lambda: on_unlock_active(overlay, monitor))
-    screen_mon.start()
-
-    try:
-        while True:
-            time.sleep(60)
-    except KeyboardInterrupt:
-        monitor.stop()
-        screen_mon.stop()
-        print("\nUnicorn Surprise arr\u00eat\u00e9.")
+    def _handle_event(self, ev):
+        kind = ev[0]
+        if kind == 'launch':
+            if not self.overlay.running:
+                self.overlay.show()
+        elif kind == 'unlock':
+            self.process_monitor.stop()
+            activated = show_choice_dialog(self.root)
+            if activated:
+                self.process_monitor.start()
 
 
-def on_unlock(overlay, monitor):
-    """Called when screen is unlocked - show choice dialog again."""
-    monitor.stop()
-    choice = show_choice_dialog()
-    if choice:
-        monitor.start()
-    # Either way, keep running to detect next unlock
+def main():
+    App().run()
 
 
 if __name__ == "__main__":
